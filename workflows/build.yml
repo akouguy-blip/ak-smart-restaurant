@@ -1,0 +1,272 @@
+# ============================================================
+# AK Smart Restaurant — Build automatique sur GitHub Actions
+#
+# Quand ce workflow se déclenche :
+#   - À chaque push sur la branche main → build "draft" (téléchargeable
+#     dans l'onglet Actions, pas de release publique)
+#   - À chaque tag git vNNN (ex: v1.0.0) → build + création automatique
+#     d'une release publique avec les .exe et .dmg attachés
+#
+# Coût : 0 FCFA. GitHub Actions est gratuit pour les repos publics.
+# Pour les repos privés : ~ 2000 minutes/mois gratuites.
+# ============================================================
+
+name: Build AK Smart Restaurant
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Permet de déclencher manuellement depuis l'onglet Actions
+
+jobs:
+  # ============================================================
+  # JOB 1 : Build Windows (.exe)
+  # ============================================================
+  build-windows:
+    name: Construire AK Smart Restaurant Setup.exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      # 1. Récupérer le code source
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2. Installer Node.js 20
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Pas de cache 'npm' ici car on a 3 package.json (backend, frontend, electron)
+          # On gère le cache manuellement avec actions/cache plus bas
+
+      # 3. Cache des node_modules pour accélérer les builds suivants (5 min vs 15 min)
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        id: cache-backend
+        with:
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package.json') }}
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package.json') }}
+
+      - name: Cache electron node_modules
+        uses: actions/cache@v4
+        id: cache-electron
+        with:
+          path: electron/node_modules
+          key: ${{ runner.os }}-electron-${{ hashFiles('electron/package.json') }}
+
+      # Cache electron-builder binaries (Electron runtime, NSIS, etc. ~ 200 MB)
+      # Sans ce cache, chaque build re-télécharge ces gros fichiers (1-2 min de perdu).
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-builder-cache
+
+      # 4. Installer les deps de chaque module
+      - name: Install backend deps
+        if: steps.cache-backend.outputs.cache-hit != 'true'
+        working-directory: backend
+        run: npm install --no-audit --no-fund
+
+      - name: Install frontend deps
+        if: steps.cache-frontend.outputs.cache-hit != 'true'
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Install electron deps
+        if: steps.cache-electron.outputs.cache-hit != 'true'
+        working-directory: electron
+        run: npm install --no-audit --no-fund
+
+      # 5. Compiler le backend
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      # 6. Compiler le frontend
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # 7. Compiler le wrapper Electron (TypeScript + copy assets)
+      - name: Build Electron wrapper
+        working-directory: electron
+        run: npm run build:ts
+
+      # 8. Produire l'installateur Windows (.exe)
+      - name: Package Windows .exe
+        working-directory: electron
+        run: npx electron-builder --win --publish never
+        env:
+          # Aide electron-builder à trouver les ressources
+          USE_HARD_LINKS: false
+
+      # 9. Lister ce qui a été produit (pour debug)
+      - name: List release artifacts
+        working-directory: electron/release
+        run: |
+          dir
+          Get-ChildItem -Recurse -File | Select-Object FullName, Length
+
+      # 10. Uploader le .exe en tant qu'artifact (téléchargeable depuis l'onglet Actions)
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ak-resto-windows-installer
+          path: |
+            electron/release/*.exe
+            electron/release/*.exe.blockmap
+          if-no-files-found: error
+          retention-days: 30
+
+  # ============================================================
+  # JOB 2 : Build Mac (.dmg) — utile si tu veux faire des démos sur Mac
+  # ============================================================
+  build-mac:
+    name: Construire AK Smart Restaurant.dmg
+    runs-on: macos-latest
+    timeout-minutes: 30
+    # On rend ce job optionnel - si Windows réussit ça suffit
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        with:
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package.json') }}
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package.json') }}
+
+      - name: Cache electron node_modules
+        uses: actions/cache@v4
+        with:
+          path: electron/node_modules
+          key: ${{ runner.os }}-electron-${{ hashFiles('electron/package.json') }}
+
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-builder-cache
+
+      - name: Install all deps
+        run: |
+          cd backend && npm install --no-audit --no-fund && cd ..
+          cd frontend && npm install --no-audit --no-fund && cd ..
+          cd electron && npm install --no-audit --no-fund && cd ..
+
+      - name: Build everything
+        run: |
+          cd backend && npm run build && cd ..
+          cd frontend && npm run build && cd ..
+          cd electron && npm run build:ts && cd ..
+
+      - name: Package Mac .dmg
+        working-directory: electron
+        run: npx electron-builder --mac --publish never
+        env:
+          # Désactive la signature de code (qui nécessite un certificat Apple payant)
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload Mac installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ak-resto-mac-installer
+          path: |
+            electron/release/*.dmg
+            electron/release/*.dmg.blockmap
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ============================================================
+  # JOB 3 : Release automatique quand on pousse un tag git v*.*.*
+  # ============================================================
+  release:
+    name: Créer une release publique
+    needs: [build-windows]  # Le mac est optionnel donc pas dans needs
+    runs-on: ubuntu-latest
+    # Se déclenche UNIQUEMENT sur les tags v*.*.*
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write  # Nécessaire pour créer une release
+
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ak-resto-windows-installer
+          path: release/
+
+      - name: Download Mac artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true  # Mac peut avoir échoué, c'est OK
+        with:
+          name: ak-resto-mac-installer
+          path: release/
+
+      - name: List release files
+        run: ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Le nom de la release = nom du tag (ex: v1.0.0)
+          name: ${{ github.ref_name }}
+          # Brouillon : tu peux relire et ajuster avant de publier
+          draft: false
+          # Pas une pré-release (release stable)
+          prerelease: false
+          # Joindre tous les fichiers téléchargés
+          files: release/*
+          # Body auto-généré à partir des commits depuis la dernière release
+          generate_release_notes: true
+          body: |
+            ## 🚀 AK Smart Restaurant — ${{ github.ref_name }}
+
+            **Téléchargez l'installateur correspondant à votre système :**
+
+            - 🪟 **Windows** : `AK Smart Restaurant Setup ${{ github.ref_name }}.exe`
+            - 🍎 **Mac** : `AK Smart Restaurant-${{ github.ref_name }}.dmg`
+
+            ### Installation
+            1. Téléchargez le fichier ci-dessous correspondant à votre système d'exploitation
+            2. Double-cliquez dessus pour lancer l'assistant d'installation
+            3. Suivez les étapes (Suivant, Suivant, Terminer)
+            4. Lancez **AK Smart Restaurant** depuis votre bureau ou menu Démarrer
+
+            ### Connexion des appareils
+            Une fois lancé, la fenêtre vous affichera l'adresse à donner aux tablettes du staff (cuisine, caisse) et aux QR codes des tables.
+
+            ---
+            Comptes pré-configurés par défaut :
+            - **Cuisine** → PIN `1234`
+            - **Caisse** → PIN `5678`
+            - **Gérant** → PIN `9999`
