@@ -1,0 +1,130 @@
+{
+  "name": "ak-smart-restaurant",
+  "productName": "AK Smart Restaurant",
+  "version": "1.0.0",
+  "description": "Gestion de restaurant avec QR codes — installé localement",
+  "author": {
+    "name": "AK Smart Restaurant",
+    "email": "support@aksmartresto.ci"
+  },
+  "main": "dist/main.js",
+  "private": true,
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps",
+    "dev": "npm run build:ts && electron dist/main.js",
+    "build:ts": "tsc && node scripts/copy-assets.js",
+    "build:backend": "cd ../backend && npm install && npm run build && cd ../frontend && npm install && npm run build && cd ../electron",
+    "build:all": "npm run build:backend && npm run build:ts",
+    "pack": "npm run build:all && electron-builder --dir",
+    "dist": "npm run build:all && electron-builder",
+    "dist:win": "npm run build:all && electron-builder --win",
+    "dist:mac": "npm run build:all && electron-builder --mac"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.5.0",
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/config": "^3.1.1",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/platform-socket.io": "^10.3.0",
+    "@nestjs/serve-static": "^4.0.2",
+    "@nestjs/websockets": "^10.3.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.1",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.7.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.10.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.3.3"
+  },
+  "build": {
+    "appId": "ci.aksmartresto.app",
+    "productName": "AK Smart Restaurant",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "!**/*.ts",
+      "!**/*.map",
+      "!**/.git",
+      "!**/node_modules/**/test/**",
+      "!**/node_modules/**/tests/**",
+      "!**/node_modules/**/*.md"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/bindings/**",
+      "**/node_modules/file-uri-to-path/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist",
+        "to": "backend/dist"
+      },
+      {
+        "from": "../backend/db",
+        "to": "backend/db"
+      },
+      {
+        "from": "../backend/node_modules",
+        "to": "backend/node_modules",
+        "filter": [
+          "**/*",
+          "!**/test/**",
+          "!**/tests/**",
+          "!**/*.md",
+          "!**/*.ts",
+          "!**/*.map",
+          "!**/better-sqlite3/**",
+          "!**/bindings/**",
+          "!**/file-uri-to-path/**"
+        ]
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "frontend/dist"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build-resources/icon.ico",
+      "publisherName": "AK Smart Restaurant"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AK Smart Restaurant",
+      "installerLanguages": ["fr_FR"],
+      "language": "1036"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build-resources/icon.icns",
+      "category": "public.app-category.business"
+    }
+  }
+}

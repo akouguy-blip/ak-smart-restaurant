@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+  background: #0B0908;
+  color: #EFE6D8;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.serif {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 500;
+}
+
+/* Scrollbar discrète sur la barre des catégories */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}

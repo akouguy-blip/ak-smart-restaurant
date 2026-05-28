@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'" />
+<title>AK Smart Restaurant — Console serveur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ak-bg: #0B0908;
+    --ak-card: #141210;
+    --ak-card-hover: #1A1714;
+    --ak-gold: #C9A876;
+    --ak-gold-dim: #8E7A57;
+    --ak-cream: #EFE6D8;
+    --ak-mute: #7A7268;
+    --ak-border: #1F1C18;
+    --green: #4ade80;
+    --red: #ef4444;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ak-bg);
+    color: var(--ak-cream);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+  .serif { font-family: 'Playfair Display', Georgia, serif; }
+  .mono { font-family: 'JetBrains Mono', Consolas, monospace; }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ============ HEADER ============ */
+  header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--ak-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .brand .ak {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--ak-gold);
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+  .brand .sep {
+    width: 1px;
+    height: 24px;
+    background: var(--ak-border);
+  }
+  .brand .title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .brand .subtitle {
+    font-size: 10px;
+    color: var(--ak-mute);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .version {
+    font-size: 10px;
+    color: var(--ak-mute);
+    letter-spacing: 1px;
+  }
+
+  /* ============ STATUS PILL ============ */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid;
+  }
+  .status-pill.up { color: var(--green); border-color: rgba(74, 222, 128, 0.3); background: rgba(74, 222, 128, 0.05); }
+  .status-pill.loading { color: var(--amber); border-color: rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.05); }
+  .status-pill.error { color: var(--red); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); }
+  .status-pill .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+  }
+
+  /* ============ MAIN ============ */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  @media (min-width: 720px) {
+    main { grid-template-columns: 1.4fr 1fr; }
+  }
+
+  /* ============ CARD ============ */
+  .card {
+    background: var(--ak-card);
+    border: 1px solid var(--ak-border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .card h2 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--ak-mute);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  /* ============ URL LIST ============ */
+  .url-block {
+    background: var(--ak-bg);
+    border: 1px solid var(--ak-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.15s;
+  }
+  .url-block:hover { border-color: var(--ak-gold-dim); }
+  .url-block .label {
+    font-size: 10px;
+    color: var(--ak-mute);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .url-block .url {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ak-gold);
+    font-size: 15px;
+    margin-top: 4px;
+    user-select: text;
+  }
+  .url-block .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .url-block button {
+    background: transparent;
+    border: 1px solid var(--ak-border);
+    color: var(--ak-cream);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .url-block button:hover {
+    border-color: var(--ak-gold);
+    color: var(--ak-gold);
+  }
+
+  /* ============ SECTION INSTRUCTIONS ============ */
+  .instructions {
+    color: var(--ak-mute);
+    font-size: 12px;
+    line-height: 1.7;
+    margin-top: 8px;
+  }
+  .instructions strong {
+    color: var(--ak-cream);
+    font-weight: 500;
+  }
+  .instructions code {
+    background: var(--ak-bg);
+    color: var(--ak-gold);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+
+  /* ============ INFO LIST ============ */
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ak-border);
+    font-size: 12px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .key { color: var(--ak-mute); }
+  .info-row .value { color: var(--ak-cream); font-weight: 500; }
+
+  /* ============ TOGGLE ============ */
+  .toggle {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    background: var(--ak-border);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: none;
+    padding: 0;
+  }
+  .toggle.on { background: var(--ak-gold); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    background: var(--ak-bg);
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* ============ BUTTON ============ */
+  .btn {
+    background: var(--ak-card);
+    border: 1px solid var(--ak-border);
+    color: var(--ak-cream);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn:hover {
+    border-color: var(--ak-gold);
+    color: var(--ak-gold);
+  }
+  .btn.gold {
+    background: var(--ak-gold);
+    color: var(--ak-bg);
+    border-color: var(--ak-gold);
+    font-weight: 500;
+  }
+  .btn.gold:hover { background: var(--ak-cream); border-color: var(--ak-cream); }
+
+  /* ============ FOOTER ============ */
+  footer {
+    padding: 12px 24px;
+    border-top: 1px solid var(--ak-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--ak-mute);
+    flex-shrink: 0;
+  }
+  footer .actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ============ ERROR ============ */
+  .error-box {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--red);
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="ak">AK</div>
+      <div class="sep"></div>
+      <div>
+        <div class="title">Smart Restaurant</div>
+        <div class="subtitle">Console serveur</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div id="status" class="status-pill loading">
+        <span class="dot"></span>
+        <span id="status-text">Démarrage…</span>
+      </div>
+      <div class="version" id="version">v—</div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- COLONNE GAUCHE : URLs d'accès -->
+    <section class="card">
+      <h2>📱 Adresses d'accès pour le restaurant</h2>
+
+      <p class="instructions" style="margin-bottom: 16px;">
+        Les <strong>tablettes du staff</strong> (cuisine, caisse) et les <strong>téléphones des clients</strong>
+        accèdent à l'application via les adresses ci-dessous, en étant connectés au même WiFi que cet ordinateur.
+      </p>
+
+      <div id="urls-list">
+        <!-- Rempli dynamiquement -->
+      </div>
+
+      <div style="margin-top: 18px;">
+        <p class="instructions">
+          <strong>QR codes des tables :</strong> imprime-les depuis le tableau d'administration
+          (URL ci-dessus, login gérant PIN <code>9999</code>, onglet <strong>Tables · QR</strong>).
+          Chaque QR code amène le client directement sur le menu de sa table.
+        </p>
+      </div>
+
+      <div id="error-display"></div>
+    </section>
+
+    <!-- COLONNE DROITE : infos système -->
+    <section class="card">
+      <h2>⚙️ Système</h2>
+
+      <div class="info-row">
+        <span class="key">Port serveur</span>
+        <span class="value mono" id="info-port">—</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Base de données</span>
+        <button class="btn" id="btn-db-folder" style="font-size: 10px; padding: 4px 8px;">Ouvrir le dossier</button>
+      </div>
+      <div class="info-row">
+        <span class="key">Fichier de logs</span>
+        <button class="btn" id="btn-log-file" style="font-size: 10px; padding: 4px 8px;">Voir les logs</button>
+      </div>
+      <div class="info-row">
+        <span class="key">Démarrer au boot Windows</span>
+        <button id="toggle-autolaunch" class="toggle" aria-label="Démarrer au boot"></button>
+      </div>
+
+      <div style="margin-top: 24px; padding: 14px; background: var(--ak-bg); border-radius: 8px; font-size: 11px; color: var(--ak-mute); line-height: 1.7;">
+        💡 <strong style="color: var(--ak-cream);">Conseil :</strong>
+        Active <em>"Démarrer au boot Windows"</em> pour que le serveur se lance automatiquement
+        à chaque allumage de l'ordinateur du restaurant.
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>Fermer cette fenêtre ne quitte PAS l'app. Le serveur continue en arrière-plan (icône près de l'horloge).</span>
+    <div class="actions">
+      <button class="btn" id="btn-refresh">↻ Rafraîchir</button>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  async function refresh() {
+    try {
+      const info = await window.akresto.getServerInfo();
+      renderInfo(info);
+    } catch (err) {
+      console.error('Failed to fetch server info:', err);
+    }
+  }
+
+  function renderInfo(info) {
+    // Version
+    $('version').textContent = `v${info.version}`;
+
+    // Status pill
+    const statusEl = $('status');
+    const statusText = $('status-text');
+    if (info.backendError) {
+      statusEl.className = 'status-pill error';
+      statusText.textContent = 'Erreur';
+    } else if (info.backendStarted) {
+      statusEl.className = 'status-pill up';
+      statusText.textContent = 'Serveur actif';
+    } else {
+      statusEl.className = 'status-pill loading';
+      statusText.textContent = 'Démarrage…';
+    }
+
+    // Port
+    $('info-port').textContent = info.port || '—';
+
+    // URLs
+    const urls = info.ips.map((ip) => `http://${ip}:${info.port}`);
+    const urlsList = $('urls-list');
+    urlsList.innerHTML = '';
+    if (urls.length === 0) {
+      urlsList.innerHTML = `
+        <div class="url-block">
+          <div>
+            <div class="label">Aucune adresse réseau détectée</div>
+            <div class="url" style="color: var(--ak-mute); font-size: 12px;">
+              Vérifie que l'ordinateur est connecté au WiFi du restaurant.
+            </div>
+          </div>
+        </div>`;
+    } else {
+      urls.forEach((url, idx) => {
+        const isFirst = idx === 0;
+        const block = document.createElement('div');
+        block.className = 'url-block';
+        block.innerHTML = `
+          <div style="min-width: 0; flex: 1; margin-right: 14px;">
+            <div class="label">${isFirst ? 'Adresse recommandée' : `Adresse alternative ${idx + 1}`}</div>
+            <div class="url">${escapeHtml(url)}</div>
+          </div>
+          <div class="actions">
+            <button data-url="${escapeHtml(url)}" data-action="open">Ouvrir</button>
+            <button data-url="${escapeHtml(url)}" data-action="copy">Copier</button>
+          </div>`;
+        urlsList.appendChild(block);
+      });
+    }
+
+    // Auto-launch toggle
+    const tog = $('toggle-autolaunch');
+    if (info.autoLaunch) tog.classList.add('on');
+    else tog.classList.remove('on');
+
+    // Error
+    const errDisplay = $('error-display');
+    if (info.backendError) {
+      errDisplay.innerHTML = `
+        <div class="error-box">
+          <strong>⚠️ Erreur de démarrage du serveur</strong><br>
+          ${escapeHtml(info.backendError)}<br>
+          <span style="opacity: 0.7;">Consulte les logs pour plus de détails.</span>
+        </div>`;
+    } else {
+      errDisplay.innerHTML = '';
+    }
+  }
+
+  // Event delegation pour les boutons d'URL
+  document.addEventListener('click', async (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    const action = t.dataset.action;
+    const url = t.dataset.url;
+    if (action === 'open' && url) {
+      await window.akresto.openUrl(url);
+    } else if (action === 'copy' && url) {
+      try {
+        await navigator.clipboard.writeText(url);
+        t.textContent = '✓ Copié';
+        setTimeout(() => { t.textContent = 'Copier'; }, 1500);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  });
+
+  $('btn-db-folder').addEventListener('click', () => window.akresto.openDbFolder());
+  $('btn-log-file').addEventListener('click', () => window.akresto.openLogFile());
+  $('btn-refresh').addEventListener('click', refresh);
+
+  $('toggle-autolaunch').addEventListener('click', async (e) => {
+    const tog = e.currentTarget;
+    const newState = !tog.classList.contains('on');
+    await window.akresto.setAutoLaunch(newState);
+    if (newState) tog.classList.add('on');
+    else tog.classList.remove('on');
+  });
+
+  // Refresh au démarrage + toutes les 3s
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+
+</body>
+</html>

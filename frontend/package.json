@@ -1,0 +1,32 @@
+{
+  "name": "ak-resto-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.6.5",
+    "dexie": "^4.0.4",
+    "pinia": "^2.1.7",
+    "qrcode": "^1.5.3",
+    "socket.io-client": "^4.7.4",
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@vitejs/plugin-vue": "^5.0.3",
+    "@vue/tsconfig": "^0.5.1",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vite-plugin-pwa": "^0.17.4",
+    "vue-tsc": "^1.8.27"
+  }
+}
