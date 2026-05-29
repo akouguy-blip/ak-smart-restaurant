@@ -42,6 +42,11 @@ if (!fs.existsSync(SECRET_PATH)) {
   fs.writeFileSync(SECRET_PATH, secret, { mode: 0o600 });
 }
 process.env.JWT_SECRET = fs.readFileSync(SECRET_PATH, 'utf8').trim();
+// Indique au backend NestJS où trouver le frontend (Vue) compilé
+const frontendPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'frontend', 'dist')
+  : path.join(__dirname, '..', '..', 'frontend', 'dist');
+process.env.FRONTEND_PATH = frontendPath;
 
 // ============================================================
 // SINGLE INSTANCE — empêcher de lancer 2 fois l'app
