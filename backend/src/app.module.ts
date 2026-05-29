@@ -14,8 +14,11 @@ import { AdminModule } from './admin/admin.module';
     ConfigModule.forRoot({ isGlobal: true }),
     // En production : sert la PWA frontend depuis /public (build Vite copié là).
     // exclude=/api*,/socket.io* pour ne pas intercepter les routes API et WebSocket.
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
+   ServeStaticModule.forRoot({
+  rootPath: process.env.FRONTEND_PATH 
+    || join(__dirname, '..', '..', 'frontend', 'dist'),
+  exclude: ['/api*', '/socket.io*'],
+}), '..', 'public'),
       exclude: ['/api', '/api/(.*)', '/socket.io', '/socket.io/(.*)'],
       serveStaticOptions: {
         index: 'index.html',
