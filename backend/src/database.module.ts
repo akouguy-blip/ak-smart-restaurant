@@ -11,12 +11,10 @@ export interface QueryResult<T = any> {
 }
 
 /**
- * Wrapper synchronous-better-sqlite3 → API "pool.query()" promise-based.
+ * Wrapper better-sqlite3 → API "pool.query()" promise-based.
  *
- * Compatibilité avec les services existants qui appelaient pool.query() (style pg) :
- *   - Convertit les placeholders $1, $2 → ?
- *   - Renvoie un { rows, rowCount } compatible pg
- *   - Convertit les codes d'erreur SQLite → codes pg (23503, 23505)
+ * Convertit les placeholders $1, $2 (style pg) en ? simples (style SQLite),
+ * en réordonnant les params pour respecter l'ordre d'apparition.
  */
 export class SqliteAdapter {
   private readonly db: Database.Database;
@@ -24,7 +22,6 @@ export class SqliteAdapter {
 
   constructor(filepath: string) {
     this.logger.log(`Ouverture de la base SQLite : ${filepath}`);
-    // S'assurer que le dossier existe
     const dir = path.dirname(filepath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
@@ -38,46 +35,41 @@ export class SqliteAdapter {
     return this.db;
   }
 
-  /**
-   * Exécute une requête SQL.
-   * Convertit $1, $2 en placeholders SQLite ?N pour préserver l'ordre des paramètres.
-   */
   async query<T = any>(sql: string, params: any[] = []): Promise<QueryResult<T>> {
-    const converted = this.convertPlaceholders(sql);
+    const { sql: converted, params: queryParams } = this.prepareQuery(sql, params);
     const isSelect = /^\s*(SELECT|WITH|PRAGMA)/i.test(converted);
     const hasReturning = /RETURNING\s+/i.test(converted);
 
     try {
       if (isSelect) {
         const stmt = this.db.prepare(converted);
-        const rows = stmt.all(...this.normalize(params)) as T[];
+        const rows = stmt.all(...queryParams) as T[];
         return { rows, rowCount: rows.length };
       }
 
       if (hasReturning) {
-        // better-sqlite3 supporte RETURNING en mode all() depuis SQLite 3.35
         const stmt = this.db.prepare(converted);
         try {
-          const rows = stmt.all(...this.normalize(params)) as T[];
+          const rows = stmt.all(...queryParams) as T[];
           return { rows, rowCount: rows.length };
         } catch {
-          // Fallback : exécuter sans RETURNING puis sélectionner
           const noReturning = converted.replace(/\s+RETURNING\s+[\s\S]*$/i, '');
           const stmt2 = this.db.prepare(noReturning);
-          const info = stmt2.run(...this.normalize(params));
+          const info = stmt2.run(...queryParams);
           return { rows: [], rowCount: info.changes };
         }
       }
 
-      // INSERT/UPDATE/DELETE normal
+      // INSERT/UPDATE/DELETE
       if (this.hasMultipleStatements(converted)) {
         this.db.exec(converted);
         return { rows: [], rowCount: 0 };
       }
       const stmt = this.db.prepare(converted);
-      const info = stmt.run(...this.normalize(params));
+      const info = stmt.run(...queryParams);
       return { rows: [], rowCount: info.changes };
     } catch (err: any) {
+      this.logger.error(`SQL ERROR: ${err.message}\nSQL: ${converted}\nPARAMS: ${JSON.stringify(queryParams)}`);
       throw this.convertError(err);
     }
   }
@@ -86,11 +78,26 @@ export class SqliteAdapter {
     this.db.close();
   }
 
-  // ---- helpers privés ----
+  /**
+   * Convertit "$1, $2, ..." → "?, ?, ..." et réordonne les params
+   * pour respecter l'ordre d'apparition réel dans la requête.
+   * Permet aussi qu'un même $N apparaisse plusieurs fois.
+   */
+  private prepareQuery(sql: string, params: any[]): { sql: string; params: any[] } {
+    if (!sql.includes('$')) {
+      return { sql, params: this.normalize(params) };
+    }
 
-  private convertPlaceholders(sql: string): string {
-    // $1, $2 → ?1, ?2 (indexed placeholders, mêmes valeurs pour les références multiples)
-    return sql.replace(/\$(\d+)/g, '?$1');
+    const matches = [...sql.matchAll(/\$(\d+)/g)];
+    if (matches.length === 0) {
+      return { sql, params: this.normalize(params) };
+    }
+
+    // Réordonner les params selon l'ordre d'apparition dans le SQL
+    const ordered = matches.map((m) => params[parseInt(m[1], 10) - 1]);
+    const newSql = sql.replace(/\$\d+/g, '?');
+
+    return { sql: newSql, params: this.normalize(ordered) };
   }
 
   private normalize(params: any[]): any[] {
