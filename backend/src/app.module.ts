@@ -12,13 +12,12 @@ import { AdminModule } from './admin/admin.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // En production : sert la PWA frontend depuis /public (build Vite copié là).
-    // exclude=/api*,/socket.io* pour ne pas intercepter les routes API et WebSocket.
-   ServeStaticModule.forRoot({
-  rootPath: process.env.FRONTEND_PATH 
-    || join(__dirname, '..', '..', 'frontend', 'dist'),
-  exclude: ['/api*', '/socket.io*'],
-}), '..', 'public'),
+    // Sert la PWA frontend (Vue compilé par Vite).
+    // En production Electron : variable FRONTEND_PATH définie par le wrapper.
+    // En dev local : chemin relatif vers ../../frontend/dist.
+    ServeStaticModule.forRoot({
+      rootPath: process.env.FRONTEND_PATH
+        || join(__dirname, '..', '..', 'frontend', 'dist'),
       exclude: ['/api', '/api/(.*)', '/socket.io', '/socket.io/(.*)'],
       serveStaticOptions: {
         index: 'index.html',
